@@ -1,0 +1,28 @@
+seed: 23
+
+paths:
+  # The Colab notebook overrides these with its temporary model/subset paths and
+  # a Google Drive run directory.
+  model_dir: models/pretrained
+  dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top10_hc/train.jsonl
+  output_dir: outputs/smoke_test_cuda_csi_top10
+
+training:
+  accelerator: gpu
+  devices: 1
+  strategy: auto
+  precision: 16-mixed
+  batch_size: 1
+  max_epochs: 1
+  # With the eight-record deterministic subset and batch_size=1, this is eight
+  # optimizer steps; it is deliberately not a full-dataset training run.
+  limit_train_batches: 8
+  num_workers: 0
+  accumulate_grad_batches: 1
+  learning_rate: 0.00005
+  warmup_fraction: 0.1
+  mask_probability: 0.15
+  # save_last writes exactly one persistent checkpoint to Google Drive.
+  save_every_n_steps: 0
+  log_every_n_steps: 1
+  deterministic: true

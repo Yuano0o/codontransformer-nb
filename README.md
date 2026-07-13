@@ -17,6 +17,7 @@ configs/
   n_benthamiana_preprocess.json  local stage-one QC
   n_benthamiana_dataset.yaml     metrics, clustering, and split parameters
   smoke_test.yaml                two-batch Colab/CUDA smoke test
+  smoke_test_cuda_csi_top10.yaml eight-step csi_top10_hc CUDA smoke test
   finetune_cuda.yaml             full CUDA/Linux starting configuration
   finetune_cuda_csi_top10.yaml   primary CSI-top-10% experiment
   finetune_cuda_csi_top25.yaml   supplementary CSI-top-25% experiment
@@ -248,7 +249,8 @@ The notebook then:
 5. downloads `adibvafa/CodonTransformer` from Hugging Face into Colab temporary
    storage;
 6. reads the cleaned, cluster-split JSONL directly from Google Drive;
-7. runs the two-batch configuration in `configs/smoke_test.yaml`;
+7. deterministically selects eight records from `csi_top10_hc` and runs the
+   eight-step CUDA configuration in `configs/smoke_test_cuda_csi_top10.yaml`;
 8. writes one final `last.ckpt`, Lightning CSV logs, `training.log`,
    `resolved_config.yaml`, and `runtime.json` directly to Google Drive;
 9. reloads `last.ckpt`, performs one `Nicotiana tabacum` conditioned inference,
