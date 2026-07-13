@@ -1,23 +1,55 @@
 seed: 23
 
+pretrained:
+  repo_id: adibvafa/CodonTransformer
+  # Exact official snapshot used by the verified local/Colab baseline setup.
+  revision: 9744dcc920d813066391fc828d7a590207f148e8
+
 paths:
   model_dir: models/pretrained
   dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top10_hc/train.jsonl
-  output_dir: outputs/finetune_cuda_csi_top10_hc
+  validation_dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top10_hc/validation.jsonl
+  test_dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top10_hc/test.jsonl
+  output_dir: outputs/finetune_cuda_csi_top10_hc_formal
+  # Set explicitly or pass --resume-from-checkpoint. The formal Colab notebook
+  # automatically uses its own Drive last.ckpt when present.
+  resume_from_checkpoint: null
+
+expected_records:
+  train: 4524
+  validation: 531
+  test: 594
 
 training:
   accelerator: gpu
   devices: 1
   strategy: auto
   precision: 16-mixed
-  batch_size: 2
-  max_epochs: 15
+  batch_size: 1
+  validation_batch_size: 1
+  max_epochs: 5
   limit_train_batches: 1.0
-  num_workers: 4
-  accumulate_grad_batches: 4
+  limit_val_batches: 1.0
+  num_workers: 2
+  # Effective batch size is 1 x 8 = 8 on one T4 GPU.
+  accumulate_grad_batches: 8
   learning_rate: 0.00005
   warmup_fraction: 0.1
   mask_probability: 0.15
-  save_every_n_steps: 512
-  log_every_n_steps: 10
+  validation_mask_seed: 1023
+  save_every_n_steps: 0
+  save_top_k: 1
+  early_stopping_patience: 2
+  early_stopping_min_delta: 0.0001
+  check_val_every_n_epoch: 1
+  num_sanity_val_steps: 0
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: norm
+  log_every_n_steps: 25
   deterministic: true
+
+evaluation:
+  expected_test_records: 594
+  batch_size: 1
+  mask_probability: 0.15
+  mask_seed: 2025

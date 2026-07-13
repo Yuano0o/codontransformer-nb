@@ -23,6 +23,7 @@ configs/
   finetune_cuda_csi_top25.yaml   supplementary CSI-top-25% experiment
 notebooks/
   codontransformer_finetune_colab.ipynb
+  codontransformer_finetune_csi_top10_colab.ipynb
 scripts/                       download, baseline, QC, training and verification
 tests/                         lightweight unit and portability tests
 data/raw/                      local-only NbeBase source data
@@ -203,19 +204,28 @@ exported amino-acid/codon token. Generated data and logs remain ignored by Git.
 
 ## CUDA/Linux training configuration
 
-`configs/finetune_cuda.yaml` targets the `all_clean_hc` training JSONL;
-`configs/finetune_cuda_csi_top10.yaml` targets the primary `csi_top10_hc`
-experiment; `configs/finetune_cuda_csi_top25.yaml` targets the supplementary
-`csi_top25_hc` experiment;
-`configs/smoke_test.yaml` is limited to two batches. All use relative paths and
-accept CLI overrides:
+`configs/finetune_cuda_csi_top10.yaml` is the current formal primary experiment.
+It uses all 4,524 training records and all 531 validation records, runs on one
+T4 with mixed FP16, uses physical batch size 1 and gradient accumulation 8
+(effective batch size 8), and allows at most five epochs. Fixed-mask validation
+drives one best checkpoint, one last checkpoint, and early stopping with
+patience 2. Gradient norm clipping is 1.0. The independent 594-record test split
+is recorded in the configuration but is never passed to `Trainer.fit`. The
+training entry checks all three configured record counts before fitting.
+
+The `all_clean_hc` and `csi_top25_hc` configurations remain inactive comparison
+plans; do not launch them during the primary experiment. Smoke configurations
+remain separate. All paths accept CLI overrides:
 
 ```bash
 python scripts/finetune_codontransformer.py \
-  --config configs/smoke_test.yaml \
+  --config configs/finetune_cuda_csi_top10.yaml \
   --model-dir /path/to/pretrained \
-  --dataset-path /path/to/cluster_split_train.jsonl \
-  --output-dir /path/to/persistent/run
+  --dataset-path /path/to/csi_top10_hc/train.jsonl \
+  --validation-dataset-path /path/to/csi_top10_hc/validation.jsonl \
+  --test-dataset-path /path/to/csi_top10_hc/test.jsonl \
+  --output-dir /path/to/persistent/formal_run \
+  --resume-from-checkpoint /path/to/persistent/formal_run/checkpoints/last.ckpt
 ```
 
 The training JSONL must already use the actual upstream format, one object per
@@ -227,7 +237,7 @@ line:
 
 No formal training has been run by this repository preparation step.
 
-## Run on Google Colab
+## Run the CUDA smoke test on Google Colab
 
 Open `notebooks/codontransformer_finetune_colab.ipynb` in a GPU Colab runtime.
 Before running it:
@@ -260,6 +270,50 @@ GitHub stores code only. Hugging Face provides the pretrained model. Google
 Drive stores training data, checkpoints, configuration snapshots, logs, and
 validation results. Colab temporary storage disappears when the runtime
 disconnects, so every checkpoint must be written to the Drive run directory.
+
+## Run formal csi_top10_hc fine-tuning on Google Colab
+
+Open `notebooks/codontransformer_finetune_csi_top10_colab.ipynb` in a T4 GPU
+runtime. This is a separate entry from the completed eight-step smoke test. It
+uses the exact verified official Hugging Face revision
+`9744dcc920d813066391fc828d7a590207f148e8` and never writes into the pretrained
+model directory or the smoke-test run directory.
+
+Upload all three primary-experiment files to Google Drive:
+
+```text
+MyDrive/CodonTransformer/data/stage2/final_csi_cohorts/experiments/csi_top10_hc/
+├── train.jsonl       # exactly 4,524 records
+├── validation.jsonl  # exactly   531 records
+└── test.jsonl        # exactly   594 records
+```
+
+All persistent formal outputs go only to:
+
+```text
+MyDrive/CodonTransformer/runs/finetune_csi_top10_hc_formal_v1/
+```
+
+The notebook checks all split counts before training. If that formal directory
+already contains `checkpoints/last.ckpt`, `AUTO_RESUME = True` resumes optimizer,
+scheduler, callback, epoch, and global-step state. The training script writes
+`best-*.ckpt`, `last.ckpt`, Lightning CSV logs, `training.log`,
+`resolved_config.yaml`, `runtime.json`, and `training_result.json` directly to
+Drive.
+
+Keep several GB of free Drive capacity: `best-*.ckpt` and `last.ckpt` are full
+Lightning checkpoints with model, optimizer, scheduler, callback, epoch, and
+global-step state.
+
+After training and model selection by validation loss, the notebook evaluates
+the immutable baseline and best fine-tuned checkpoint on all 594 test records
+using identical deterministic masks. `test_baseline_vs_finetuned.json` reports
+masked-token NLL, perplexity, top-1 accuracy, top-3 accuracy, and signed deltas.
+These fixed-mask metrics are a reproducible held-out language-model comparison;
+they are not a substitute for downstream biological validation.
+The final inference cell also reloads the best checkpoint, generates one DNA
+sequence, and verifies its translation. Test data must not be used for early
+stopping or checkpoint selection.
 
 ## Checkpoint reload outside Colab
 
