@@ -1,0 +1,25 @@
+seed: 23
+
+paths:
+  # Portable defaults. Colab overrides all three paths on the command line.
+  model_dir: models/pretrained
+  dataset_path: data/finetune/train.jsonl
+  output_dir: outputs/smoke_test
+
+training:
+  accelerator: gpu
+  devices: 1
+  strategy: auto
+  precision: 16-mixed
+  batch_size: 1
+  max_epochs: 1
+  limit_train_batches: 2
+  num_workers: 0
+  accumulate_grad_batches: 1
+  learning_rate: 0.00005
+  warmup_fraction: 0.1
+  mask_probability: 0.15
+  # Zero disables intermediate checkpoints; save_last still writes last.ckpt.
+  save_every_n_steps: 0
+  log_every_n_steps: 1
+  deterministic: true

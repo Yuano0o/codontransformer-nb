@@ -1,0 +1,32 @@
+{
+  "pipeline_version": "1.0.0",
+  "random_seed": 23,
+  "inputs": {
+    "cds_fasta": "data/raw/n_benthamiana/nbenbase_v1.1/Nbe_v1.1_cds_HC.fa.gz",
+    "protein_fasta": "data/raw/n_benthamiana/nbenbase_v1.1/Nbe_v1.1_pep_HC.fa.gz",
+    "annotation_xlsx": "data/raw/n_benthamiana/nbenbase_v1.1/Nbe_v1.1_HC_ann.xlsx.gz",
+    "gff3": "data/raw/n_benthamiana/nbenbase_v1.1/Nbe_v1.1.2_HC.fixed.gff3.gz"
+  },
+  "outputs": {
+    "directory": "data/processed/n_benthamiana",
+    "accepted_csv": "accepted_all_hc.csv",
+    "rejected_csv": "rejected.csv",
+    "qc_summary_json": "qc_summary.json"
+  },
+  "log_path": "results/logs/n_benthamiana_preprocess.log",
+  "labels": {
+    "organism": "Nicotiana tabacum",
+    "source_organism": "Nicotiana benthamiana"
+  },
+  "filters": {
+    "allowed_dna_alphabet": "ATCG",
+    "required_start_codon": "ATG",
+    "standard_stop_codons": [
+      "TAA",
+      "TAG",
+      "TGA"
+    ],
+    "translation_table": 1,
+    "max_protein_length": 2045
+  }
+}

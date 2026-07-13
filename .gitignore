@@ -1,0 +1,57 @@
+# Local environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# The official upstream repository is cloned during setup and stays local.
+upstream/
+
+# Models and training artifacts
+models/pretrained/
+models/finetuned/*
+!models/finetuned/.gitkeep
+checkpoints/
+outputs/
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.onnx
+
+# Raw and generated biological data
+Nbe_v*.fa
+Nbe_v*.fa.gz
+Nbe_v*.fasta
+Nbe_v*.fasta.gz
+Nbe_v*.gff3
+Nbe_v*.gff3.gz
+Nbe_v*.xlsx
+Nbe_v*.xlsx.gz
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/finetune/
+*.jsonl
+*.jsonl.gz
+
+# Runtime results and logs
+results/*
+!results/.gitkeep
+*.log
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*credentials*.json
+*service-account*.json
+*.pem
+*.key
+
+# Superseded local-only configuration retained for reference.
+configs/cuda_finetune.env
