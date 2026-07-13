@@ -44,6 +44,25 @@ class ProjectPortabilityTests(unittest.TestCase):
         ):
             self.assertIn(required, gitignore)
 
+    def test_hygiene_check_includes_untracked_candidates(self):
+        script = (ROOT / "scripts" / "check_repository_hygiene.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"--others"', script)
+        self.assertIn('"--exclude-standard"', script)
+
+    def test_ambiguous_csi_cohort_name_is_not_used(self):
+        forbidden = "high" + "_csi_hc"
+        candidates = [ROOT / "README.md"]
+        for directory in ("configs", "scripts", "tests", "notebooks"):
+            candidates.extend(
+                path
+                for path in (ROOT / directory).rglob("*")
+                if path.is_file() and path.suffix in {".py", ".yaml", ".json", ".ipynb"}
+            )
+        for path in candidates:
+            self.assertNotIn(forbidden, path.read_text(encoding="utf-8"), str(path))
+
 
 if __name__ == "__main__":
     unittest.main()

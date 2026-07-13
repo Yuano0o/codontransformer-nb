@@ -2,8 +2,8 @@ seed: 23
 
 paths:
   model_dir: models/pretrained
-  dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/all_clean_hc/train.jsonl
-  output_dir: outputs/finetune_cuda_all_clean_hc
+  dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top25_hc/train.jsonl
+  output_dir: outputs/finetune_cuda_csi_top25_hc
 
 training:
   accelerator: gpu

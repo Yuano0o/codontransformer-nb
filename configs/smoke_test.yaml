@@ -3,7 +3,7 @@ seed: 23
 paths:
   # Portable defaults. Colab overrides all three paths on the command line.
   model_dir: models/pretrained
-  dataset_path: data/finetune/train.jsonl
+  dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/all_clean_hc/train.jsonl
   output_dir: outputs/smoke_test
 
 training:

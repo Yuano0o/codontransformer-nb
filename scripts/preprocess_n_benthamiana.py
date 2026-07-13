@@ -457,7 +457,7 @@ def run(config_path: Path) -> dict:
             "compute CSI/CAI, GC, and codon-usage metrics",
             "cluster protein sequences by similarity",
             "split by similarity cluster to prevent homology leakage",
-            "prepare all_clean_hc and high_csi_hc experiment cohorts",
+            "prepare all_clean_hc, csi_top10_hc, and csi_top25_hc cohorts",
             "export CodonTransformer finetune JSONL only after cluster-aware splitting",
         ],
     }

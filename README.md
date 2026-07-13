@@ -15,8 +15,11 @@ pinned here to commit `4a447b01dab860feb81b647ff1ff88ad598517f4`
 .github/workflows/             lightweight GitHub CI
 configs/
   n_benthamiana_preprocess.json  local stage-one QC
+  n_benthamiana_dataset.yaml     metrics, clustering, and split parameters
   smoke_test.yaml                two-batch Colab/CUDA smoke test
   finetune_cuda.yaml             full CUDA/Linux starting configuration
+  finetune_cuda_csi_top10.yaml   primary CSI-top-10% experiment
+  finetune_cuda_csi_top25.yaml   supplementary CSI-top-25% experiment
 notebooks/
   codontransformer_finetune_colab.ipynb
 scripts/                       download, baseline, QC, training and verification
@@ -127,15 +130,84 @@ case-insensitively but preserved. Failed sequences are never repaired; all
 applicable reasons are retained in `rejected.csv`.
 
 The current local result is 56,487 accepted and 1,096 rejected records. Do not
-convert `accepted_all_hc.csv` directly into final training data. The next stage
-must compute CSI/CAI and codon-use metrics, cluster proteins by similarity,
-perform cluster-aware splits, and define `all_clean_hc` and `high_csi_hc`.
+convert `accepted_all_hc.csv` directly into training data without the next
+cluster-aware stage.
+
+## N. benthamiana metrics, clustering, and leak-resistant splits
+
+The complete second-stage workflow is controlled by
+`configs/n_benthamiana_dataset.yaml` and uses seed 23. Install MMseqs2 outside
+the Python environment (`brew install mmseqs2` on macOS, or use the Linux
+system/package environment available on the CUDA server), then verify
+`mmseqs version` works.
+
+Run the stages in order:
+
+```bash
+source .venv/bin/activate
+
+python scripts/compute_codon_metrics.py \
+  --config configs/n_benthamiana_dataset.yaml
+
+python scripts/cluster_proteins.py \
+  --config configs/n_benthamiana_dataset.yaml
+
+python scripts/build_cluster_splits.py \
+  --config configs/n_benthamiana_dataset.yaml
+
+python scripts/validate_cluster_splits.py \
+  --config configs/n_benthamiana_dataset.yaml
+```
+
+The metrics stage computes CSI, CAI, GC1/GC2/GC3/GC3s, rare- and optimal-codon
+fractions, mean relative codon weight, synonymous-codon entropy, and L1 codon
+usage distance. CSI uses all accepted CDS as the *N. benthamiana* reference.
+Without expression measurements, CAI uses the top 10% by CSI as an explicit
+proxy reference; it must not be interpreted as expression-grounded CAI.
+The cohort names encode their selection unambiguously: `csi_top10_hc` is the
+primary experiment, `csi_top25_hc` is the supplementary experiment, and
+`all_clean_hc` is full-data domain adaptation. The current CSI thresholds are
+`0.80074785` for the top 10% and `0.77651441` for the top 25%.
+
+The strict MMseqs2 configuration uses 30% minimum protein identity, 80%
+bidirectional coverage, connected-component clustering, sensitivity 7.5, and
+up to 1,000 candidates per query. Whole clusters, never individual records, are
+assigned to 80/10/10 train/validation/test splits.
+
+Current local-only outputs:
+
+```text
+data/processed/n_benthamiana/stage2/
+├── accepted_all_hc_metrics.csv
+├── codon_reference.json
+├── metrics_summary_csi_cohorts.json
+├── cluster_membership_strict.csv
+├── cluster_summary_strict.json
+└── final_csi_cohorts/
+    ├── split_manifest.csv
+    ├── dataset_summary.json
+    ├── validation_report.json
+    └── experiments/
+        ├── all_clean_hc/{train,validation,test}.{csv,jsonl}
+        ├── csi_top10_hc/{train,validation,test}.{csv,jsonl}
+        └── csi_top25_hc/{train,validation,test}.{csv,jsonl}
+```
+
+The strict result contains 26,984 clusters. The seeded cluster shuffle balances
+both record counts and cluster-size distributions. Train/validation/test counts
+are 45,190/5,649/5,648 for `all_clean_hc`, 4,524/531/594 for
+`csi_top10_hc`, and 11,318/1,383/1,421 for `csi_top25_hc`. Independent
+validation confirms zero cluster intersection across splits and validates every
+exported amino-acid/codon token. Generated data and logs remain ignored by Git.
 
 ## CUDA/Linux training configuration
 
-`configs/finetune_cuda.yaml` is the portable full-training starting point;
-`configs/smoke_test.yaml` is limited to two batches. Both use relative placeholder
-paths and accept CLI overrides:
+`configs/finetune_cuda.yaml` targets the `all_clean_hc` training JSONL;
+`configs/finetune_cuda_csi_top10.yaml` targets the primary `csi_top10_hc`
+experiment; `configs/finetune_cuda_csi_top25.yaml` targets the supplementary
+`csi_top25_hc` experiment;
+`configs/smoke_test.yaml` is limited to two batches. All use relative paths and
+accept CLI overrides:
 
 ```bash
 python scripts/finetune_codontransformer.py \
@@ -149,7 +221,7 @@ The training JSONL must already use the actual upstream format, one object per
 line:
 
 ```json
-{"idx": 0, "codons": "M_ATG K_AAG __TAA", "organism": 80}
+{"idx": 0, "codons": "M_ATG K_AAG __TAA", "organism": 78}
 ```
 
 No formal training has been run by this repository preparation step.
@@ -159,10 +231,12 @@ No formal training has been run by this repository preparation step.
 Open `notebooks/codontransformer_finetune_colab.ipynb` in a GPU Colab runtime.
 Before running it:
 
-1. Create the GitHub repository and edit `REPO_URL` in the notebook.
-2. Upload the later cluster-aware training JSONL to
-   `MyDrive/CodonTransformer/data/clustered/train.jsonl`, or edit the configured
-   Drive-relative path.
+1. Because this code repository is private, add a fine-grained GitHub token with
+   read access as a Colab secret named `GITHUB_TOKEN`. Never paste or save the
+   token in the notebook, GitHub, or Google Drive.
+2. Upload the selected cluster-aware training JSONL to
+   `MyDrive/CodonTransformer/data/stage2/final_csi_cohorts/experiments/csi_top10_hc/train.jsonl`,
+   or edit `DRIVE_TRAINING_DATA` to use `csi_top25_hc` or `all_clean_hc`.
 3. Select a GPU runtime.
 
 The notebook then:

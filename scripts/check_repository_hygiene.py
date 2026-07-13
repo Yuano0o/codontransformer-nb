@@ -22,7 +22,11 @@ MAX_FILE_BYTES = 10 * 1024 * 1024
 
 def candidate_files() -> list[Path]:
     result = subprocess.run(
-        ["git", "ls-files"], cwd=ROOT, text=True, capture_output=True, check=False
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
     )
     if result.returncode == 0 and result.stdout.strip():
         return [ROOT / line for line in result.stdout.splitlines()]

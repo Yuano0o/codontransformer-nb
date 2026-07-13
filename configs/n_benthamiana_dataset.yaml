@@ -1,0 +1,62 @@
+pipeline_version: "2.1.0"
+seed: 23
+
+paths:
+  accepted_csv: data/processed/n_benthamiana/accepted_all_hc.csv
+  stage2_dir: data/processed/n_benthamiana/stage2
+  metrics_csv: data/processed/n_benthamiana/stage2/accepted_all_hc_metrics.csv
+  codon_reference_json: data/processed/n_benthamiana/stage2/codon_reference.json
+  metrics_summary_json: data/processed/n_benthamiana/stage2/metrics_summary_csi_cohorts.json
+  protein_fasta: data/processed/n_benthamiana/stage2/clustering_strict/proteins.fasta
+  mmseqs_prefix: data/processed/n_benthamiana/stage2/clustering_strict/mmseqs/nben_hc
+  mmseqs_tmp_dir: data/processed/n_benthamiana/stage2/clustering_strict/mmseqs_tmp
+  cluster_membership_csv: data/processed/n_benthamiana/stage2/cluster_membership_strict.csv
+  cluster_summary_json: data/processed/n_benthamiana/stage2/cluster_summary_strict.json
+  experiments_dir: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments
+  split_manifest_csv: data/processed/n_benthamiana/stage2/final_csi_cohorts/split_manifest.csv
+  dataset_summary_json: data/processed/n_benthamiana/stage2/final_csi_cohorts/dataset_summary.json
+  validation_report_json: data/processed/n_benthamiana/stage2/final_csi_cohorts/validation_report.json
+  metrics_log: results/logs/n_benthamiana_metrics.log
+  clustering_log: results/logs/n_benthamiana_clustering.log
+  dataset_log: results/logs/n_benthamiana_dataset_build_csi_cohorts.log
+  validation_log: results/logs/n_benthamiana_dataset_validation_csi_cohorts.log
+
+metrics:
+  genetic_code: 1
+  pseudocount: 0.0
+  rare_codon_weight_threshold: 0.3
+  cai_reference:
+    mode: top_csi_quantile
+    quantile: 0.90
+
+cohorts:
+  all_clean_hc:
+    role: full_domain_adaptation
+    selection: all
+  csi_top10_hc:
+    role: primary_experiment
+    selection: csi_quantile
+    quantile: 0.90
+  csi_top25_hc:
+    role: supplementary_experiment
+    selection: csi_quantile
+    quantile: 0.75
+
+clustering:
+  executable: mmseqs
+  min_sequence_identity: 0.30
+  coverage: 0.80
+  coverage_mode: 0
+  cluster_mode: 1
+  max_sequences: 1000
+  sensitivity: 7.5
+  threads: 8
+
+split:
+  train: 0.80
+  validation: 0.10
+  test: 0.10
+
+training_export:
+  organism_name: Nicotiana tabacum
+  organism_id: 78
