@@ -85,6 +85,29 @@ class ProjectPortabilityTests(unittest.TestCase):
         self.assertNotIn("csi_top25_hc", code_source)
         self.assertNotIn("all_clean_hc", code_source)
 
+    def test_biological_evaluation_colab_is_test_only_and_resumable(self):
+        path = (
+            ROOT
+            / "notebooks"
+            / "codontransformer_biological_evaluation_colab.ipynb"
+        )
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
+        for required in (
+            "test.jsonl",
+            "best-epoch04-val_loss0.842573.ckpt",
+            "codon_reference.json",
+            "evaluate_biological_fidelity.py",
+            "--expected-records\", \"594",
+            "prediction caches",
+            "biological_evaluation_summary.json",
+        ):
+            self.assertIn(required, source)
+        self.assertNotIn("finetune_codontransformer.py", source)
+        self.assertNotIn("trainer.fit", source)
+
     def test_large_local_artifacts_are_ignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for required in (

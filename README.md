@@ -24,6 +24,7 @@ configs/
 notebooks/
   codontransformer_finetune_colab.ipynb
   codontransformer_finetune_csi_top10_colab.ipynb
+  codontransformer_biological_evaluation_colab.ipynb
 scripts/                       download, baseline, QC, training and verification
 tests/                         lightweight unit and portability tests
 data/raw/                      local-only NbeBase source data
@@ -314,6 +315,44 @@ they are not a substitute for downstream biological validation.
 The final inference cell also reloads the best checkpoint, generates one DNA
 sequence, and verifies its translation. Test data must not be used for early
 stopping or checkpoint selection.
+
+## Paired biological evaluation on the independent test split
+
+`notebooks/codontransformer_biological_evaluation_colab.ipynb` performs no
+training. It compares the official pretrained baseline, the formal
+`best-epoch04-val_loss0.842573.ckpt`, and the true CDS reconstructed directly
+from all 594 records in the independent `csi_top10_hc/test.jsonl`.
+
+Upload the local reference file
+`data/processed/n_benthamiana/stage2/codon_reference.json` to:
+
+```text
+MyDrive/CodonTransformer/data/stage2/codon_reference.json
+```
+
+The evaluator uses deterministic synonymous-codon-constrained decoding and
+reports translation correctness, sequence validity, CSI, top-10%-reference CAI,
+GC and GC3 error versus the true CDS, Jensen-Shannon codon-frequency distance,
+rare-codon fraction, exact positional codon match, and short/medium/long protein
+strata. Fine-tuned versus baseline comparisons use paired bootstrap confidence
+intervals and two-sided Wilcoxon tests with Benjamini-Hochberg correction.
+
+Persistent outputs are written below the completed formal run without modifying
+its checkpoints:
+
+```text
+MyDrive/CodonTransformer/runs/finetune_csi_top10_hc_formal_v1/
+└── biological_evaluation_v1/
+    ├── evaluation_manifest.json
+    ├── prediction_cache/{baseline,finetuned}_predictions.jsonl
+    ├── per_sequence_metrics.csv
+    ├── biological_evaluation_summary.json
+    └── biological_evaluation_report.md
+```
+
+Prediction caches are flushed to Drive every 25 records. Re-running after a
+free-Colab interruption resumes only missing predictions; it never starts or
+resumes training.
 
 ## Checkpoint reload outside Colab
 
