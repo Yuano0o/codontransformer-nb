@@ -441,6 +441,7 @@ class ProjectPortabilityTests(unittest.TestCase):
             "--test-dataset",
             "test_dataset_path",
             "finetune_csi_top10_hc_formal_v1/checkpoints",
+            "import pandas",
         ):
             self.assertNotIn(forbidden, source)
 
