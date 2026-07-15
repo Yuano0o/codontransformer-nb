@@ -1,0 +1,83 @@
+experiment_version: validation_hybrid_decoding_check_v1
+dataset_role: validation
+
+inputs:
+  expected_records: 531
+  validation_sha256: 8e37ce0eff5684b1e42d6772fd3b0b6549a57d734fbb5e8fbc0ba4ec40058b49
+  reference_sha256: 3d63f51d45972365fc92e7e20052ac82453cb10b09fcf26b76e5f6aaf0eec908
+  source_experiment_version: validation_decoding_v1
+  source_checkpoint_sha256: 89e16c13e8b0bc0004d9552b254c30fe847374537a2de0c3854c1ba69f7c5c82
+
+paths:
+  validation_dataset: data/stage2/final_csi_cohorts/experiments/csi_top10_hc/validation.jsonl
+  codon_reference: data/stage2/codon_reference.json
+  formal_run: runs/finetune_csi_top10_hc_formal_v1
+  source_decoding_directory: validation_decoding_diagnostics_v1
+  output_directory: validation_hybrid_decoding_check_v1
+
+target_families:
+  - E
+  - K
+  - L
+  - S
+
+# Candidate codons are spliced only from the already frozen finetuned cache.
+# Non-target positions, start ATG, and stop codons always remain greedy.
+candidates:
+  s_temperature_only:
+    default_source: greedy
+    rules:
+      - families: [S]
+        source: temperature_sampling
+  s_family_only:
+    default_source: greedy
+    rules:
+      - families: [S]
+        source: synonymous_family_sampling
+  high_entropy_temperature:
+    default_source: greedy
+    rules:
+      - families: [E, K, L, S]
+        source: temperature_sampling
+        minimum_normalized_entropy: 0.75
+        maximum_probability: 0.75
+  s_family_ekl_entropy_temperature:
+    default_source: greedy
+    rules:
+      - families: [S]
+        source: synonymous_family_sampling
+      - families: [E, K, L]
+        source: temperature_sampling
+        minimum_normalized_entropy: 0.75
+        maximum_probability: 0.75
+
+length_boundaries:
+  source: frozen_refined_v2_test_boundaries
+  short_max_aa: 140.0
+  medium_max_aa: 280.3333333333333
+
+statistics:
+  seed: 23
+  bootstrap_samples: 10000
+  rare_codon_threshold: 0.3
+  paired_test: wilcoxon_two_sided
+  multiple_testing: global_bh_across_candidates_within_overall_or_each_length_stratum
+
+# A decoder-only fix must improve both a target-family JSD and a target-family
+# RSCU metric, while causing no significant regression in any protected metric.
+selection_gate:
+  translation_requirement: 1.0
+  validity_requirement: 1.0
+  require_stable_jsd_improvement: true
+  require_stable_rscu_improvement: true
+  protected_metrics:
+    - csi
+    - cai
+    - gc_absolute_error
+    - gc3_absolute_error
+    - codon_jsd_to_true
+    - codon_match_rate
+    - synonymous_family_jsd_to_true
+    - synonymous_family_jsd_to_reference
+    - synonymous_family_rscu_l1_to_true
+    - synonymous_family_rscu_l1_to_reference

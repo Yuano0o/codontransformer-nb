@@ -266,6 +266,92 @@ class ProjectPortabilityTests(unittest.TestCase):
         self.assertNotIn("trainer.fit", source)
         self.assertNotIn("finetune_codontransformer.py", source)
 
+    def test_hybrid_decoding_config_is_a_strict_pre_v2_gate(self):
+        config = yaml.safe_load(
+            (
+                ROOT / "configs" / "check_validation_hybrid_decoding.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(config["dataset_role"], "validation")
+        self.assertEqual(config["inputs"]["expected_records"], 531)
+        self.assertEqual(
+            config["inputs"]["source_checkpoint_sha256"],
+            "89e16c13e8b0bc0004d9552b254c30fe847374537a2de0c3854c1ba69f7c5c82",
+        )
+        self.assertEqual(
+            set(config["candidates"]),
+            {
+                "s_temperature_only",
+                "s_family_only",
+                "high_entropy_temperature",
+                "s_family_ekl_entropy_temperature",
+            },
+        )
+        gate = config["selection_gate"]
+        self.assertEqual(gate["translation_requirement"], 1.0)
+        self.assertEqual(gate["validity_requirement"], 1.0)
+        self.assertTrue(gate["require_stable_jsd_improvement"])
+        self.assertTrue(gate["require_stable_rscu_improvement"])
+        self.assertIn("csi", gate["protected_metrics"])
+        self.assertIn("cai", gate["protected_metrics"])
+        self.assertIn("gc3_absolute_error", gate["protected_metrics"])
+
+    def test_hybrid_decoding_script_is_cache_only_and_validation_only(self):
+        script = (
+            ROOT / "scripts" / "check_validation_hybrid_decoding.py"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "--validation-dataset",
+            "--source-decoding-dir",
+            "record_cache",
+            "finetuned.jsonl",
+            "decoder_only_gate_passed",
+            "proceed_to_v2_finetuning",
+            '"test_access_prohibited": True',
+            '"model_forward_performed": False',
+            '"training_performed": False',
+            "paired_comparisons_vs_v1_greedy_by_length",
+        ):
+            self.assertIn(required, script)
+        for forbidden in (
+            'add_argument("--test-dataset"',
+            "BigBirdForMaskedLM",
+            "AutoModel",
+            "load_checkpoint",
+            "trainer.fit",
+        ):
+            self.assertNotIn(forbidden, script)
+
+    def test_hybrid_decoding_colab_does_not_load_a_model_or_test(self):
+        path = (
+            ROOT
+            / "notebooks"
+            / "codontransformer_validation_hybrid_decoding_colab.ipynb"
+        )
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
+        for required in (
+            "check_validation_hybrid_decoding.yaml",
+            "check_validation_hybrid_decoding.py",
+            "record_cache/finetuned.jsonl",
+            "--source-decoding-dir",
+            "proceed_to_v2_finetuning",
+            "model_forward_performed",
+            "training_performed",
+        ):
+            self.assertIn(required, source)
+        for forbidden in (
+            "test.jsonl",
+            "TEST_PATH",
+            "download_pretrained.py",
+            "BigBirdForMaskedLM",
+            "load_checkpoint",
+            "trainer.fit",
+        ):
+            self.assertNotIn(forbidden, source)
+
     def test_large_local_artifacts_are_ignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for required in (

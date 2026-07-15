@@ -23,12 +23,14 @@ configs/
   finetune_cuda_csi_top25.yaml   supplementary CSI-top-25% experiment
   evaluate_validation_refined_v2.yaml frozen validation evaluation inputs/rules
   diagnose_validation_decoding.yaml frozen E/K/L/S decoding diagnosis
+  check_validation_hybrid_decoding.yaml decoder-only gate before v2
 notebooks/
   codontransformer_finetune_colab.ipynb
   codontransformer_finetune_csi_top10_colab.ipynb
   codontransformer_biological_evaluation_colab.ipynb
   codontransformer_validation_evaluation_colab.ipynb
   codontransformer_validation_decoding_colab.ipynb
+  codontransformer_validation_hybrid_decoding_colab.ipynb
 scripts/                       download, baseline, QC, training and verification
 tests/                         lightweight unit and portability tests
 data/raw/                      local-only NbeBase source data
@@ -486,6 +488,49 @@ MyDrive/CodonTransformer/runs/finetune_csi_top10_hc_formal_v1/
 Sampling strategies are compared with their same-model greedy output using
 paired validation statistics. Strategy selection must use these validation
 results only; the test split remains out of scope.
+
+### Final decoder-only gate before v2 fine-tuning
+
+`notebooks/codontransformer_validation_hybrid_decoding_colab.ipynb` is the last
+check before changing the training objective. It requires no GPU and performs
+no model download, model/checkpoint load, forward pass, or training. It reads
+the frozen validation JSONL/reference plus the completed finetuned
+`validation_decoding_diagnostics_v1/record_cache/finetuned.jsonl` and evaluates
+four predeclared hybrid candidates:
+
+- S-only T=0.5 sampling;
+- S-only T=1 synonymous-family sampling;
+- E/K/L/S T=0.5 sampling only at high-entropy, low-maximum-probability positions;
+- S at T=1 plus high-entropy-gated E/K/L T=0.5 sampling.
+
+All non-selected positions, start ATG, and terminal stops remain exactly v1
+greedy. Every candidate DNA must pass strict sequence validity and translate
+exactly to its input protein. The analysis recomputes the full frozen biological
+metric set and compares each candidate with v1 greedy using paired bootstrap,
+two-sided Wilcoxon, and global BH correction across all candidates, both overall
+and within the fixed short/medium/long strata.
+
+The decoder-only gate passes only if a candidate has stable E/K/L/S improvement
+in at least one JSD and one RSCU metric, while CSI, CAI, GC/GC3 error, positional
+codon match, and full synonymous-family distribution show no significant
+regression overall or in any length stratum. If no candidate passes, the report
+sets `proceed_to_v2_finetuning: true`.
+
+Persistent cache-only results are written to:
+
+```text
+MyDrive/CodonTransformer/runs/finetune_csi_top10_hc_formal_v1/
+└── validation_hybrid_decoding_check_v1/
+    ├── evaluation_manifest.json
+    ├── candidate_predictions.jsonl
+    ├── per_sequence_hybrid_metrics.csv
+    ├── hybrid_decoding_summary.json
+    └── hybrid_decoding_report.md
+```
+
+The test split remains prohibited. If the decoder-only gate fails, v2
+fine-tuning still uses validation for selection and requires a new external
+holdout for final assessment.
 
 ## Checkpoint reload outside Colab
 
