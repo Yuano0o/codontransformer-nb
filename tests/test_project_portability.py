@@ -433,6 +433,7 @@ class ProjectPortabilityTests(unittest.TestCase):
             "parameter_changed",
             "translation_verified",
             "checkpoints/last.ckpt",
+            "Binary stack:",
         ):
             self.assertIn(required, source)
         for forbidden in (
@@ -441,7 +442,8 @@ class ProjectPortabilityTests(unittest.TestCase):
             "--test-dataset",
             "test_dataset_path",
             "finetune_csi_top10_hc_formal_v1/checkpoints",
-            "import pandas",
+            "pd.read_csv",
+            "from scripts.validate_checkpoint_inference import load_checkpoint",
         ):
             self.assertNotIn(forbidden, source)
 
