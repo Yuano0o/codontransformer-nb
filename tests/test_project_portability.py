@@ -180,6 +180,92 @@ class ProjectPortabilityTests(unittest.TestCase):
         self.assertNotIn("finetune_codontransformer.py", source)
         self.assertNotIn("trainer.fit", source)
 
+    def test_validation_decoding_config_freezes_safe_strategies(self):
+        config = yaml.safe_load(
+            (
+                ROOT / "configs" / "diagnose_validation_decoding.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(config["dataset_role"], "validation")
+        self.assertEqual(config["inputs"]["expected_records"], 531)
+        self.assertEqual(config["target_families"], ["E", "K", "L", "S"])
+        self.assertEqual(config["statistics"]["seed"], 23)
+        self.assertEqual(
+            config["length_boundaries"],
+            {
+                "source": "frozen_refined_v2_test_boundaries",
+                "short_max_aa": 140.0,
+                "medium_max_aa": 280.3333333333333,
+            },
+        )
+        strategies = config["strategies"]
+        self.assertEqual(set(strategies), {
+            "greedy",
+            "temperature_sampling",
+            "synonymous_family_sampling",
+        })
+        self.assertEqual(strategies["greedy"]["mode"], "argmax")
+        self.assertEqual(strategies["temperature_sampling"]["temperature"], 0.5)
+        self.assertEqual(strategies["temperature_sampling"]["top_p"], 0.95)
+        self.assertEqual(
+            strategies["synonymous_family_sampling"]["temperature"], 1.0
+        )
+        self.assertEqual(strategies["synonymous_family_sampling"]["top_p"], 1.0)
+
+    def test_validation_decoding_script_enforces_translation_and_no_test_input(self):
+        script = (
+            ROOT / "scripts" / "diagnose_validation_decoding.py"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "--validation-dataset",
+            'validation_dataset.name != "validation.jsonl"',
+            "Refusing any dataset other than validation.jsonl",
+            "AMINO_ACID_TO_INDEX",
+            "translation_correct",
+            "sequence_valid",
+            "stable_seed",
+            '"checkpoint_sha256": checkpoint_sha256',
+            "argmax_concentration",
+            "mean_position_normalized_entropy",
+            "paired_strategy_comparisons_vs_greedy",
+            "paired_strategy_comparisons_vs_greedy_by_length",
+            "probability_diagnostics_by_length",
+            "collapse_diagnosis_by_length",
+            "test_access_prohibited",
+        ):
+            self.assertIn(required, script)
+        for forbidden in (
+            'add_argument("--test-dataset"',
+            "trainer.fit",
+            "finetune_codontransformer.py",
+        ):
+            self.assertNotIn(forbidden, script)
+
+    def test_validation_decoding_colab_is_read_only_and_resumable(self):
+        path = (
+            ROOT
+            / "notebooks"
+            / "codontransformer_validation_decoding_colab.ipynb"
+        )
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
+        for required in (
+            "diagnose_validation_decoding.yaml",
+            "diagnose_validation_decoding.py",
+            "--validation-dataset",
+            "record cache",
+            "collapse_diagnosis",
+            "test_access_prohibited",
+            "--force-analysis",
+        ):
+            self.assertIn(required, source)
+        self.assertNotIn("test.jsonl", source)
+        self.assertNotIn("TEST_PATH", source)
+        self.assertNotIn("trainer.fit", source)
+        self.assertNotIn("finetune_codontransformer.py", source)
+
     def test_large_local_artifacts_are_ignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for required in (

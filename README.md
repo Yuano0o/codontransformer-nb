@@ -22,11 +22,13 @@ configs/
   finetune_cuda_csi_top10.yaml   primary CSI-top-10% experiment
   finetune_cuda_csi_top25.yaml   supplementary CSI-top-25% experiment
   evaluate_validation_refined_v2.yaml frozen validation evaluation inputs/rules
+  diagnose_validation_decoding.yaml frozen E/K/L/S decoding diagnosis
 notebooks/
   codontransformer_finetune_colab.ipynb
   codontransformer_finetune_csi_top10_colab.ipynb
   codontransformer_biological_evaluation_colab.ipynb
   codontransformer_validation_evaluation_colab.ipynb
+  codontransformer_validation_decoding_colab.ipynb
 scripts/                       download, baseline, QC, training and verification
 tests/                         lightweight unit and portability tests
 data/raw/                      local-only NbeBase source data
@@ -434,6 +436,56 @@ MyDrive/CodonTransformer/data/stage2/final_csi_cohorts/experiments/csi_top10_hc/
 Keep this validation analysis for diagnosis and model selection under the
 frozen rules. The previously inspected 594-record test results remain a
 separate final report and must not be used for further tuning.
+
+### Validation-only E/K/L/S probability and decoding diagnosis
+
+`notebooks/codontransformer_validation_decoding_colab.ipynb` diagnoses whether
+the E, K, L, and S family regressions originate in the model probabilities or
+are amplified by greedy decoding. It runs no training and accepts only the
+SHA256-pinned 531-record validation JSONL. The script refuses a non-validation
+dataset and never reads the test split or its prediction caches.
+
+For pretrained and v1 separately, the experiment records the T=1 probability
+distribution conditional on the correct synonymous family at every E/K/L/S
+position. It reports mean probability by codon, position entropy, normalized
+entropy, maximum probability, argmax frequency, argmax concentration, and
+argmax HHI. These diagnostics and the paired strategy comparisons are reported
+both overall and within the frozen refined-v2 short/medium/long boundaries. It
+then evaluates three translation-preserving strategies:
+
+- `greedy`: synonymous-family argmax;
+- `temperature_sampling`: family-masked T=0.5, top-p=0.95 sampling;
+- `synonymous_family_sampling`: family-masked T=1, top-p=1 sampling.
+
+All three strategies mask non-synonymous tokens before decoding, including the
+terminal stop family. Every generated DNA is rejected immediately unless it
+passes the same strict sequence-validity checks and translates exactly to the
+input protein. Random seeds are derived deterministically from the frozen seed,
+model, strategy, and record idx, so resuming an interrupted Colab run cannot
+change previously generated or future records.
+
+The runner also computes the full v1 checkpoint SHA256 before creating any
+cache and stores it in `evaluation_manifest.json`; later sessions refuse to
+reuse caches if the checkpoint content changes.
+
+The fixed experiment definition is
+`configs/diagnose_validation_decoding.yaml`. Persistent output is isolated from
+the earlier test and validation evaluations:
+
+```text
+MyDrive/CodonTransformer/runs/finetune_csi_top10_hc_formal_v1/
+└── validation_decoding_diagnostics_v1/
+    ├── evaluation_manifest.json
+    ├── record_cache/{baseline,finetuned}.jsonl
+    ├── family_probability_summary.csv
+    ├── per_sequence_strategy_metrics.csv
+    ├── decoding_diagnostic_summary.json
+    └── decoding_diagnostic_report.md
+```
+
+Sampling strategies are compared with their same-model greedy output using
+paired validation statistics. Strategy selection must use these validation
+results only; the test split remains out of scope.
 
 ## Checkpoint reload outside Colab
 

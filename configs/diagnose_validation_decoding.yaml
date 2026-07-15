@@ -1,0 +1,65 @@
+experiment_version: validation_decoding_v1
+dataset_role: validation
+
+inputs:
+  expected_records: 531
+  validation_sha256: 8e37ce0eff5684b1e42d6772fd3b0b6549a57d734fbb5e8fbc0ba4ec40058b49
+  reference_sha256: 3d63f51d45972365fc92e7e20052ac82453cb10b09fcf26b76e5f6aaf0eec908
+  pretrained_model_safetensors_sha256: 23994e1e7324e78c9d9da71040e8677c0a635287cf1c7c9ea5096b7eadc44dfd
+  checkpoint_filename: best-epoch04-val_loss0.842573.ckpt
+  checkpoint_size_bytes: 1070490343
+  # Filled only if a trusted hash is recorded later. The runner always computes
+  # the actual SHA256 and freezes it in evaluation_manifest.json before caching.
+  checkpoint_sha256: null
+
+paths:
+  validation_dataset: data/stage2/final_csi_cohorts/experiments/csi_top10_hc/validation.jsonl
+  codon_reference: data/stage2/codon_reference.json
+  formal_run: runs/finetune_csi_top10_hc_formal_v1
+  output_directory: validation_decoding_diagnostics_v1
+
+model:
+  organism: Nicotiana tabacum
+  attention_type: original_full
+  device: cuda
+
+target_families:
+  - E
+  - K
+  - L
+  - S
+
+# Every strategy masks non-synonymous tokens before argmax/sampling. This makes
+# amino-acid translation preservation a hard constraint rather than a metric.
+strategies:
+  greedy:
+    mode: argmax
+    temperature: 1.0
+    top_p: 1.0
+  temperature_sampling:
+    mode: sample
+    temperature: 0.5
+    top_p: 0.95
+  synonymous_family_sampling:
+    mode: sample
+    temperature: 1.0
+    top_p: 1.0
+
+# Frozen from refined-v2. The validation experiment must not recompute bins.
+length_boundaries:
+  source: frozen_refined_v2_test_boundaries
+  short_max_aa: 140.0
+  medium_max_aa: 280.3333333333333
+
+statistics:
+  seed: 23
+  bootstrap_samples: 10000
+  rare_codon_threshold: 0.3
+  collapse_thresholds:
+    normalized_entropy_drop: 0.05
+    mean_max_probability_increase: 0.05
+    argmax_concentration_increase: 0.10
+    greedy_entropy_gap: 0.10
+
+runtime:
+  cache_flush_every: 10
