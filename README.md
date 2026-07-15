@@ -354,6 +354,43 @@ Prediction caches are flushed to Drive every 25 records. Re-running after a
 free-Colab interruption resumes only missing predictions; it never starts or
 resumes training.
 
+### Refine a completed biological evaluation without inference
+
+After the v1 evaluator has produced `per_sequence_metrics.csv`, the paired
+analysis can be refined locally without loading PyTorch, a model, or a
+checkpoint:
+
+```bash
+python scripts/refine_biological_evaluation.py \
+  --per-sequence-csv results/csi_top10_hc_formal_v1/biological_evaluation_v1/per_sequence_metrics.csv \
+  --reference-json data/processed/n_benthamiana/stage2/codon_reference.json \
+  --output-dir results/csi_top10_hc_formal_v1/biological_evaluation_v1/refined_analysis_v2 \
+  --bootstrap-samples 10000 \
+  --seed 23
+```
+
+The command preserves all v1 files and refuses to overwrite an existing v2
+output directory unless `--force` is explicitly supplied. It adds
+amino-acid-family-conditional Jensen-Shannon and RSCU distances, paired
+bootstrap confidence intervals and BH-adjusted Wilcoxon tests for each protein
+length stratum, and codon-family attribution. Outputs are:
+
+```text
+refined_analysis_v2/
+├── refined_biological_evaluation_report.md
+├── refined_biological_evaluation_summary.json
+├── per_sequence_refined_metrics.csv
+└── synonymous_codon_family_attribution.csv
+```
+
+The stricter decision requires at least 99.9% translation correctness and
+sequence validity, stable improvements in at least two distinct target
+categories (preference, composition, or synonymous-codon distribution), and no
+significant target regression overall or within short, medium, or long protein
+strata. Because the 594-record test set has now been inspected, subsequent
+hyperparameter or checkpoint selection must use validation data or a new
+external holdout—not this test report.
+
 ## Checkpoint reload outside Colab
 
 ```bash

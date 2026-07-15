@@ -108,6 +108,29 @@ class ProjectPortabilityTests(unittest.TestCase):
         self.assertNotIn("finetune_codontransformer.py", source)
         self.assertNotIn("trainer.fit", source)
 
+    def test_refined_biological_evaluation_is_analysis_only(self):
+        script = (
+            ROOT / "scripts" / "refine_biological_evaluation.py"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "--per-sequence-csv",
+            "--reference-json",
+            "--bootstrap-samples",
+            "synonymous_family_jsd_to_true",
+            "length_stratified_paired_statistics",
+            "required_stable_improvement_categories",
+            "Refusing to overwrite existing refined outputs",
+            "test_reuse_warning",
+        ):
+            self.assertIn(required, script)
+        for forbidden in (
+            "import torch",
+            "from torch",
+            "AutoModel",
+            "trainer.fit",
+        ):
+            self.assertNotIn(forbidden, script)
+
     def test_large_local_artifacts_are_ignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for required in (
