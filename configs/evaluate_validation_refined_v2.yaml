@@ -1,0 +1,43 @@
+evaluation_version: refined_v2
+dataset_role: validation
+
+inputs:
+  expected_records: 531
+  dataset_sha256: 8e37ce0eff5684b1e42d6772fd3b0b6549a57d734fbb5e8fbc0ba4ec40058b49
+  reference_sha256: 3d63f51d45972365fc92e7e20052ac82453cb10b09fcf26b76e5f6aaf0eec908
+  pretrained_model_safetensors_sha256: 23994e1e7324e78c9d9da71040e8677c0a635287cf1c7c9ea5096b7eadc44dfd
+  checkpoint_filename: best-epoch04-val_loss0.842573.ckpt
+  checkpoint_size_bytes: 1070490343
+
+paths:
+  validation_dataset: data/stage2/final_csi_cohorts/experiments/csi_top10_hc/validation.jsonl
+  codon_reference: data/stage2/codon_reference.json
+  formal_run: runs/finetune_csi_top10_hc_formal_v1
+  output_directory: validation_biological_evaluation_v1
+  refined_output_directory: refined_analysis_v2
+
+decoding:
+  organism: Nicotiana tabacum
+  deterministic: true
+  synonymous_decoding_constrained: true
+  rare_codon_threshold: 0.3
+
+# Frozen from the 594-record refined-v2 test analysis. Never recompute these
+# boundaries on validation, otherwise the length strata are not comparable.
+length_boundaries:
+  source: frozen_refined_v2_test_boundaries
+  short_max_aa: 140.0
+  medium_max_aa: 280.3333333333333
+
+statistics:
+  bootstrap_samples: 10000
+  seed: 23
+  paired_test: wilcoxon_two_sided
+  multiple_testing: benjamini_hochberg_within_overall_and_each_length_stratum
+  translation_requirement: 0.999
+  validity_requirement: 0.999
+  required_stable_improvement_categories: 2
+
+runtime:
+  device: cuda
+  prediction_cache_flush_every: 25

@@ -131,6 +131,55 @@ class ProjectPortabilityTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, script)
 
+    def test_validation_evaluation_freezes_refined_v2_inputs_and_boundaries(self):
+        config = yaml.safe_load(
+            (
+                ROOT / "configs" / "evaluate_validation_refined_v2.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(config["evaluation_version"], "refined_v2")
+        self.assertEqual(config["dataset_role"], "validation")
+        self.assertEqual(config["inputs"]["expected_records"], 531)
+        self.assertEqual(
+            config["inputs"]["dataset_sha256"],
+            "8e37ce0eff5684b1e42d6772fd3b0b6549a57d734fbb5e8fbc0ba4ec40058b49",
+        )
+        self.assertEqual(config["length_boundaries"]["short_max_aa"], 140.0)
+        self.assertEqual(
+            config["length_boundaries"]["medium_max_aa"],
+            280.3333333333333,
+        )
+        self.assertEqual(config["statistics"]["bootstrap_samples"], 10000)
+        self.assertEqual(config["statistics"]["seed"], 23)
+
+    def test_validation_evaluation_colab_is_read_only_and_resumable(self):
+        path = (
+            ROOT
+            / "notebooks"
+            / "codontransformer_validation_evaluation_colab.ipynb"
+        )
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
+        for required in (
+            "evaluate_validation_refined_v2.yaml",
+            'CONFIG["paths"]["validation_dataset"]',
+            'CONFIG["inputs"]["dataset_sha256"]',
+            "expected_records",
+            "--dataset-role\", \"validation",
+            "--expected-dataset-sha256",
+            "--length-short-max",
+            "--length-medium-max",
+            "refine_biological_evaluation.py",
+            'CONFIG["paths"]["output_directory"]',
+            "Prediction caches",
+            "--force",
+        ):
+            self.assertIn(required, source)
+        self.assertNotIn("finetune_codontransformer.py", source)
+        self.assertNotIn("trainer.fit", source)
+
     def test_large_local_artifacts_are_ignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for required in (

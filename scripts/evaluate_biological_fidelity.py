@@ -447,10 +447,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def write_markdown(path: Path, summary: dict[str, Any]) -> None:
+    dataset_role = str(summary.get("dataset_role", "test"))
     lines = [
         "# csi_top10_hc biological fidelity evaluation",
         "",
-        f"Test records: {summary['records']}",
+        f"{dataset_role.capitalize()} records: {summary['records']}",
         "",
         "| Metric | Baseline | Fine-tuned | Mean improvement | 95% bootstrap CI | Wilcoxon BH q |",
         "|---|---:|---:|---:|---:|---:|",
@@ -480,20 +481,42 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--test-dataset", type=Path, required=True)
+    parser.add_argument("--test-dataset", "--dataset", dest="test_dataset", type=Path, required=True)
+    parser.add_argument("--dataset-role", choices=("test", "validation"), default="test")
     parser.add_argument("--reference-json", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--device", choices=("auto", "cpu", "mps", "cuda"), default="auto")
     parser.add_argument("--organism", default="Nicotiana tabacum")
     parser.add_argument("--expected-records", type=int, default=594)
     parser.add_argument("--expected-test-sha256")
+    parser.add_argument("--expected-dataset-sha256")
     parser.add_argument("--expected-reference-sha256")
     parser.add_argument("--expected-pretrained-sha256")
+    parser.add_argument("--length-short-max", type=float)
+    parser.add_argument("--length-medium-max", type=float)
     parser.add_argument("--rare-threshold", type=float, default=0.3)
     parser.add_argument("--bootstrap-samples", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=23)
     parser.add_argument("--flush-every", type=int, default=25)
     args = parser.parse_args()
+
+    fixed_boundaries_requested = (
+        args.length_short_max is not None or args.length_medium_max is not None
+    )
+    if fixed_boundaries_requested and (
+        args.length_short_max is None or args.length_medium_max is None
+    ):
+        raise ValueError("Both --length-short-max and --length-medium-max are required")
+    if fixed_boundaries_requested and args.length_short_max >= args.length_medium_max:
+        raise ValueError("length-short-max must be smaller than length-medium-max")
+    if args.dataset_role == "validation" and not fixed_boundaries_requested:
+        raise ValueError("Validation evaluation requires frozen explicit length boundaries")
+    if (
+        args.expected_test_sha256 is not None
+        and args.expected_dataset_sha256 is not None
+        and args.expected_test_sha256 != args.expected_dataset_sha256
+    ):
+        raise ValueError("Conflicting expected dataset SHA256 values")
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logger = logging.getLogger("codontransformer_biological_evaluation")
@@ -519,8 +542,11 @@ def main() -> None:
     if not pretrained_weights.is_file():
         raise FileNotFoundError(f"Pretrained weights not found: {pretrained_weights}")
     pretrained_sha256 = sha256(pretrained_weights)
+    expected_dataset_sha256 = (
+        args.expected_dataset_sha256 or args.expected_test_sha256
+    )
     for label, expected, actual in (
-        ("test dataset", args.expected_test_sha256, test_sha256),
+        (f"{args.dataset_role} dataset", expected_dataset_sha256, test_sha256),
         ("codon reference", args.expected_reference_sha256, reference_sha256),
         ("pretrained weights", args.expected_pretrained_sha256, pretrained_sha256),
     ):
@@ -531,8 +557,15 @@ def main() -> None:
         raise RuntimeError("CUDA was requested but is unavailable")
     records = load_test_records(test_dataset, args.expected_records)
     reference = load_reference(reference_json)
+    lengths = [record["protein_length"] for record in records]
+    boundaries = (
+        (float(args.length_short_max), float(args.length_medium_max))
+        if fixed_boundaries_requested
+        else tercile_boundaries(lengths)
+    )
+    dataset_hash_key = f"{args.dataset_role}_dataset_sha256"
     manifest = {
-        "test_dataset_sha256": test_sha256,
+        dataset_hash_key: test_sha256,
         "reference_json_sha256": reference_sha256,
         "pretrained_model_safetensors_sha256": pretrained_sha256,
         "checkpoint_path": str(checkpoint),
@@ -545,6 +578,21 @@ def main() -> None:
         "bootstrap_samples": args.bootstrap_samples,
         "seed": args.seed,
     }
+    if args.dataset_role != "test" or fixed_boundaries_requested:
+        manifest.update(
+            {
+                "dataset_role": args.dataset_role,
+                "length_boundaries": {
+                    "source": (
+                        "frozen_refined_v2_test_boundaries"
+                        if fixed_boundaries_requested
+                        else "dataset_terciles"
+                    ),
+                    "short_max": boundaries[0],
+                    "medium_max": boundaries[1],
+                },
+            }
+        )
     manifest_path = output_dir / "evaluation_manifest.json"
     if manifest_path.exists():
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -578,8 +626,6 @@ def main() -> None:
         if device.type == "cuda":
             torch.cuda.empty_cache()
 
-    lengths = [record["protein_length"] for record in records]
-    boundaries = tercile_boundaries(lengths)
     table = CodonTable.unambiguous_dna_by_id[int(reference["genetic_code"])]
     sense_codon_order = tuple(sorted(table.forward_table))
     reference_frequencies = [
@@ -678,8 +724,13 @@ def main() -> None:
     translation_requirement_met = overall["finetuned"]["translation_correct_rate"] >= 0.999
     summary = {
         **manifest,
+        "dataset_role": args.dataset_role,
         "length_bins": {
-            "method": "test-set protein-length terciles",
+            "method": (
+                "frozen refined-v2 test-set protein-length boundaries"
+                if fixed_boundaries_requested
+                else "test-set protein-length terciles"
+            ),
             "short_max": boundaries[0],
             "medium_max": boundaries[1],
             "counts": Counter(row["length_bin"] for row in rows),

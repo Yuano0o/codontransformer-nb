@@ -21,10 +21,12 @@ configs/
   finetune_cuda.yaml             full CUDA/Linux starting configuration
   finetune_cuda_csi_top10.yaml   primary CSI-top-10% experiment
   finetune_cuda_csi_top25.yaml   supplementary CSI-top-25% experiment
+  evaluate_validation_refined_v2.yaml frozen validation evaluation inputs/rules
 notebooks/
   codontransformer_finetune_colab.ipynb
   codontransformer_finetune_csi_top10_colab.ipynb
   codontransformer_biological_evaluation_colab.ipynb
+  codontransformer_validation_evaluation_colab.ipynb
 scripts/                       download, baseline, QC, training and verification
 tests/                         lightweight unit and portability tests
 data/raw/                      local-only NbeBase source data
@@ -390,6 +392,48 @@ significant target regression overall or within short, medium, or long protein
 strata. Because the 594-record test set has now been inspected, subsequent
 hyperparameter or checkpoint selection must use validation data or a new
 external holdout—not this test report.
+
+### Three-way validation evaluation with frozen refined-v2 rules
+
+`notebooks/codontransformer_validation_evaluation_colab.ipynb` compares true
+CDS, the exact official pretrained baseline, and
+`best-epoch04-val_loss0.842573.ckpt` on all 531 validation records. It performs
+no training and writes to a separate Drive directory:
+
+```text
+MyDrive/CodonTransformer/runs/finetune_csi_top10_hc_formal_v1/
+└── validation_biological_evaluation_v1/
+    ├── evaluation_manifest.json
+    ├── prediction_cache/{baseline,finetuned}_predictions.jsonl
+    ├── per_sequence_metrics.csv
+    ├── biological_evaluation_summary.json
+    ├── biological_evaluation_report.md
+    └── refined_analysis_v2/
+        ├── refined_biological_evaluation_report.md
+        ├── refined_biological_evaluation_summary.json
+        ├── per_sequence_refined_metrics.csv
+        └── synonymous_codon_family_attribution.csv
+```
+
+All immutable inputs and rules are recorded in
+`configs/evaluate_validation_refined_v2.yaml`: 531 records, the validation and
+reference SHA256 values, the pretrained snapshot SHA256, the formal checkpoint
+name and size, bootstrap seed/sample count, and the test-derived length bins
+`short <= 140 aa`, `medium <= 280.3333333333333 aa`, and `long` above that.
+The validation boundaries are never recomputed. Prediction caches are flushed
+to Drive every 25 records and resume after a Colab interruption. The final
+analysis cell deliberately regenerates only the small refined-v2 tables; it
+does not alter checkpoints, model weights, test outputs, or prediction caches.
+
+The validation JSONL must already be present at:
+
+```text
+MyDrive/CodonTransformer/data/stage2/final_csi_cohorts/experiments/csi_top10_hc/validation.jsonl
+```
+
+Keep this validation analysis for diagnosis and model selection under the
+frozen rules. The previously inspected 594-record test results remain a
+separate final report and must not be used for further tuning.
 
 ## Checkpoint reload outside Colab
 

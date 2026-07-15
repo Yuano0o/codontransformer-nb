@@ -388,10 +388,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str] | None =
 
 
 def write_report(path: Path, summary: dict[str, Any], families: list[dict[str, Any]]) -> None:
+    dataset_role = summary["dataset_role"]
     lines = [
-        "# Refined csi_top10_hc biological evaluation",
+        f"# Refined csi_top10_hc {dataset_role} biological evaluation",
         "",
-        "This is an analysis-only refinement of the frozen 594-record v1 test predictions; no model inference or training was rerun.",
+        f"This is an analysis-only refinement of the frozen {summary['records']}-record v1 {dataset_role} predictions; no model inference or training was rerun.",
         "",
         "## Strict decision",
         "",
@@ -454,7 +455,7 @@ def write_report(path: Path, summary: dict[str, Any], families: list[dict[str, A
     lines.extend(
         [
             "",
-            "The test set has already been inspected. Use validation, not this test report, for any subsequent hyperparameter or checkpoint selection.",
+            summary["selection_warning"],
         ]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -467,8 +468,24 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--bootstrap-samples", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=23)
+    parser.add_argument("--expected-records", type=int, default=594)
+    parser.add_argument("--dataset-role", choices=("test", "validation"), default="test")
+    parser.add_argument("--length-short-max", type=float)
+    parser.add_argument("--length-medium-max", type=float)
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
+
+    fixed_boundaries_requested = (
+        args.length_short_max is not None or args.length_medium_max is not None
+    )
+    if fixed_boundaries_requested and (
+        args.length_short_max is None or args.length_medium_max is None
+    ):
+        raise ValueError("Both --length-short-max and --length-medium-max are required")
+    if fixed_boundaries_requested and args.length_short_max >= args.length_medium_max:
+        raise ValueError("length-short-max must be smaller than length-medium-max")
+    if args.dataset_role == "validation" and not fixed_boundaries_requested:
+        raise ValueError("Validation refinement requires frozen explicit length boundaries")
 
     per_sequence_csv = args.per_sequence_csv.expanduser().resolve()
     reference_json = args.reference_json.expanduser().resolve()
@@ -490,8 +507,29 @@ def main() -> None:
     reference = json.loads(reference_json.read_text(encoding="utf-8"))
     original_rows = read_rows(per_sequence_csv)
     rows, families, stop_codons = enrich_rows(original_rows, reference)
-    if len(rows) != 594:
-        raise ValueError(f"Expected the frozen 594-record test evaluation, found {len(rows)}")
+    if len(rows) != args.expected_records:
+        raise ValueError(
+            f"Expected the frozen {args.expected_records}-record {args.dataset_role} "
+            f"evaluation, found {len(rows)}"
+        )
+    if fixed_boundaries_requested:
+        boundaries = (float(args.length_short_max), float(args.length_medium_max))
+        mismatches = [
+            row["idx"]
+            for row in rows
+            if row["length_bin"] != (
+                "short"
+                if int(row["protein_length"]) <= boundaries[0]
+                else "medium"
+                if int(row["protein_length"]) <= boundaries[1]
+                else "long"
+            )
+        ]
+        if mismatches:
+            raise ValueError(
+                "Per-sequence length bins do not match the frozen refined-v2 "
+                f"boundaries; first mismatched idx values: {mismatches[:10]}"
+            )
 
     overall = {
         metric: paired_statistic(
@@ -559,6 +597,7 @@ def main() -> None:
     summary = {
         "analysis_version": "2.0.0",
         "analysis_only": True,
+        "dataset_role": args.dataset_role,
         "records": len(rows),
         "inputs": {
             "per_sequence_csv": str(per_sequence_csv),
@@ -568,6 +607,15 @@ def main() -> None:
         },
         "bootstrap_samples": args.bootstrap_samples,
         "seed": args.seed,
+        "length_boundaries": (
+            {
+                "source": "frozen_refined_v2_test_boundaries",
+                "short_max": float(args.length_short_max),
+                "medium_max": float(args.length_medium_max),
+            }
+            if fixed_boundaries_requested
+            else None
+        ),
         "multiple_testing": "Benjamini-Hochberg within overall and separately within each length stratum",
         "synonymous_distribution_metric": {
             "jsd": "amino-acid-family conditional Jensen-Shannon distance, weighted by synonymous positions",
@@ -592,9 +640,18 @@ def main() -> None:
                 else "mixed_or_length_dependent_effect; broad claim not supported"
             ),
         },
+        "selection_warning": (
+            "This validation analysis may support model diagnosis and selection under the frozen "
+            "rules. Keep the already inspected test report separate and do not tune against it."
+            if args.dataset_role == "validation"
+            else "The test set has already been inspected. Use validation or a new external "
+            "holdout, not this test set, for subsequent tuning and checkpoint selection."
+        ),
         "test_reuse_warning": (
-            "The 594-record test set has been inspected. Use validation or a new external holdout, "
+            "The test set has already been inspected. Use validation or a new external holdout, "
             "not this test set, for subsequent tuning and checkpoint selection."
+            if args.dataset_role == "test"
+            else None
         ),
     }
 
