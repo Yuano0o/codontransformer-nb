@@ -434,6 +434,8 @@ class ProjectPortabilityTests(unittest.TestCase):
             "translation_verified",
             "checkpoints/last.ckpt",
             "Binary stack:",
+            "BINARY_STACK_SENTINEL",
+            "Restart session",
         ):
             self.assertIn(required, source)
         for forbidden in (
