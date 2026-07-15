@@ -532,6 +532,52 @@ The test split remains prohibited. If the decoder-only gate fails, v2
 fine-tuning still uses validation for selection and requires a new external
 holdout for final assessment.
 
+### v2 synonymous-family calibrated fine-tuning
+
+The final decoder-only gate found no strategy that improved E/K/L/S JSD and
+RSCU without significantly reducing CSI, CAI, or positional codon match.
+`scripts/finetune_codontransformer_v2.py` therefore changes the training
+objective while leaving the verified v1 workflow untouched. The v2 objective
+is:
+
+```text
+total loss = MLM loss + 0.2 × synonymous-family distribution JSD
+```
+
+The auxiliary term is evaluated only at masked E/K/L/S positions. For each
+family it compares the mean predicted within-family probability distribution
+with a frozen 50:50 mixture of the whole-species CSI reference and the Top10
+proxy-CAI reference in `codon_reference.json`. MLM remains the dominant term.
+Train and validation file counts and SHA256 hashes are frozen; no test path is
+accepted by the v2 trainer.
+
+The v2 experiment starts again from the same immutable official pretrained
+snapshot used by v1. This gives a controlled comparison of objectives and does
+not inherit the already concentrated v1 output distribution. It writes to new
+directories and never overwrites v1, the CUDA smoke test, or pretrained files:
+
+```text
+MyDrive/CodonTransformer/runs/
+├── finetune_csi_top10_hc_v2_smoke_v1/
+└── finetune_csi_top10_hc_formal_v2/
+```
+
+Open `notebooks/codontransformer_finetune_csi_top10_v2_colab.ipynb` with
+`RUN_MODE = "smoke"` first. The smoke configuration runs eight train and eight
+validation batches and verifies finite MLM/JSD/total losses, changed weights,
+checkpoint reload, DNA generation, and exact back-translation. After those
+checks pass, change only `RUN_MODE` to `"formal"`. Formal settings retain batch
+size 1, gradient accumulation 8, `16-mixed`, five epochs, early stopping, and
+best-checkpoint selection by `val_total_loss`. One Drive `last.ckpt` is replaced
+every 200 optimizer steps so a later Colab session can resume without restarting
+the completed epoch.
+
+The formal run still uses validation only for model selection. Do not read the
+existing test split while choosing the v2 objective, regularization weight,
+epoch, or checkpoint. After v2 selection is frozen, use a new external holdout
+for the final biological claim because the current test split has already been
+inspected during v1 development.
+
 ## Checkpoint reload outside Colab
 
 ```bash

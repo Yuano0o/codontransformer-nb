@@ -352,6 +352,105 @@ class ProjectPortabilityTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
 
+    def test_v2_configs_freeze_inputs_and_regularized_objective(self):
+        smoke = yaml.safe_load(
+            (
+                ROOT / "configs" / "smoke_test_cuda_csi_top10_v2.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        formal = yaml.safe_load(
+            (
+                ROOT / "configs" / "finetune_cuda_csi_top10_v2.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        for config in (smoke, formal):
+            self.assertEqual(
+                config["expected_records"], {"train": 4524, "validation": 531}
+            )
+            self.assertNotIn("test_dataset_path", config["paths"])
+            self.assertEqual(
+                config["expected_sha256"]["train"],
+                "bce089949fbbdee0c5e2403c22d6a1cba16a6cc851fdf731954af18f6b9df16d",
+            )
+            self.assertEqual(
+                config["expected_sha256"]["validation"],
+                "8e37ce0eff5684b1e42d6772fd3b0b6549a57d734fbb5e8fbc0ba4ec40058b49",
+            )
+            objective = config["objective"]
+            self.assertEqual(objective["target_families"], ["E", "K", "L", "S"])
+            self.assertEqual(objective["mlm_weight"], 1.0)
+            self.assertEqual(objective["synonymous_distribution_weight"], 0.2)
+            self.assertEqual(objective["csi_reference_weight"], 0.5)
+            self.assertEqual(objective["cai_reference_weight"], 0.5)
+        self.assertEqual(smoke["training"]["limit_train_batches"], 8)
+        self.assertEqual(smoke["training"]["limit_val_batches"], 8)
+        self.assertEqual(formal["training"]["precision"], "16-mixed")
+        self.assertEqual(formal["training"]["accumulate_grad_batches"], 8)
+        self.assertEqual(formal["training"]["save_every_n_steps"], 200)
+        self.assertGreaterEqual(formal["training"]["max_epochs"], 3)
+        self.assertLessEqual(formal["training"]["max_epochs"], 5)
+
+    def test_v2_trainer_is_separate_resumable_and_validation_selected(self):
+        source = (
+            ROOT / "scripts" / "finetune_codontransformer_v2.py"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "synonymous_distribution_loss",
+            "torch.isin",
+            "val_total_loss",
+            "synonymous_reference_targets.json",
+            "every_n_train_steps",
+            "resume_from_checkpoint",
+            '"test_access_prohibited": True',
+            "trainer.save_checkpoint(last_checkpoint)",
+        ):
+            self.assertIn(required, source)
+        for forbidden in (
+            'add_argument("--test-dataset',
+            "test_dataset_path",
+            "evaluate_codontransformer_test.py",
+        ):
+            self.assertNotIn(forbidden, source)
+
+    def test_v2_colab_defaults_to_smoke_and_prohibits_test_access(self):
+        path = (
+            ROOT
+            / "notebooks"
+            / "codontransformer_finetune_csi_top10_v2_colab.ipynb"
+        )
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
+        for required in (
+            "!nvidia-smi",
+            'CODONTRANSFORMER_V2_RUN_MODE\", \"smoke',
+            "smoke_test_cuda_csi_top10_v2.yaml",
+            "finetune_cuda_csi_top10_v2.yaml",
+            "finetune_codontransformer_v2.py",
+            "--resume-from-checkpoint",
+            "synonymous_jsd_loss",
+            "parameter_changed",
+            "translation_verified",
+            "checkpoints/last.ckpt",
+        ):
+            self.assertIn(required, source)
+        for forbidden in (
+            "test.jsonl",
+            "TEST_PATH",
+            "--test-dataset",
+            "test_dataset_path",
+            "finetune_csi_top10_hc_formal_v1/checkpoints",
+        ):
+            self.assertNotIn(forbidden, source)
+
+    def test_checkpoint_loader_ignores_non_model_v2_buffers(self):
+        source = (
+            ROOT / "scripts" / "validate_checkpoint_inference.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('if key.startswith("model.")', source)
+        self.assertIn("return model_state or state_dict", source)
+
     def test_large_local_artifacts_are_ignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for required in (

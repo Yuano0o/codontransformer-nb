@@ -1,0 +1,57 @@
+experiment_version: csi_top10_hc_v2_smoke_v1
+seed: 23
+
+pretrained:
+  repo_id: adibvafa/CodonTransformer
+  revision: 9744dcc920d813066391fc828d7a590207f148e8
+
+paths:
+  model_dir: models/pretrained
+  train_dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top10_hc/train.jsonl
+  validation_dataset_path: data/processed/n_benthamiana/stage2/final_csi_cohorts/experiments/csi_top10_hc/validation.jsonl
+  reference_json: data/processed/n_benthamiana/stage2/codon_reference.json
+  output_dir: outputs/finetune_csi_top10_hc_v2_smoke
+  resume_from_checkpoint: null
+
+expected_records:
+  train: 4524
+  validation: 531
+
+expected_sha256:
+  train: bce089949fbbdee0c5e2403c22d6a1cba16a6cc851fdf731954af18f6b9df16d
+  validation: 8e37ce0eff5684b1e42d6772fd3b0b6549a57d734fbb5e8fbc0ba4ec40058b49
+  reference: 3d63f51d45972365fc92e7e20052ac82453cb10b09fcf26b76e5f6aaf0eec908
+
+objective:
+  mlm_weight: 1.0
+  synonymous_distribution_weight: 0.2
+  target_families: [E, K, L, S]
+  csi_reference_weight: 0.5
+  cai_reference_weight: 0.5
+  epsilon: 1.0e-8
+
+training:
+  accelerator: gpu
+  devices: 1
+  strategy: auto
+  precision: 16-mixed
+  batch_size: 1
+  validation_batch_size: 1
+  max_epochs: 1
+  limit_train_batches: 8
+  limit_val_batches: 8
+  num_workers: 2
+  accumulate_grad_batches: 1
+  learning_rate: 0.00005
+  warmup_fraction: 0.1
+  mask_probability: 0.15
+  validation_mask_seed: 1023
+  save_every_n_steps: 4
+  early_stopping_patience: 1
+  early_stopping_min_delta: 0.0001
+  check_val_every_n_epoch: 1
+  num_sanity_val_steps: 0
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: norm
+  log_every_n_steps: 1
+  deterministic: true

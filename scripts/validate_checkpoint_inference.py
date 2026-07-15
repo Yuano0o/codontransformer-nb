@@ -29,10 +29,14 @@ def load_checkpoint(path: Path) -> dict:
     except TypeError:
         payload = torch.load(path, map_location="cpu")
     state_dict = payload.get("state_dict", payload)
-    return {
+    model_state = {
         key.removeprefix("model."): value
         for key, value in state_dict.items()
+        if key.startswith("model.")
     }
+    # Lightning harnesses may contain objective buffers in addition to model.*.
+    # Older raw model state dictionaries have no model. prefix and remain valid.
+    return model_state or state_dict
 
 
 def main() -> None:
