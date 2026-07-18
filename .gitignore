@@ -48,10 +48,44 @@ results/*
 .env
 .env.*
 !.env.example
+.envrc
+.direnv/
+*.local
+*.local.*
+*.private
+*.private.*
+local/
+.private/
+secrets/
 *credentials*.json
 *service-account*.json
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.cer
+*.crt
+*.der
+id_rsa
+id_rsa.*
+
+# Keep biological tables and sequence files out of the repository even when
+# they are accidentally created outside data/.  The committed data directories
+# contain only their .gitkeep placeholders.
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.fa
+*.fasta
+*.gff
+*.gff3
+*.fa.gz
+*.fasta.gz
+*.gff.gz
+*.gff3.gz
 
 # Superseded local-only configuration retained for reference.
 configs/cuda_finetune.env

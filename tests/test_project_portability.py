@@ -475,6 +475,24 @@ class ProjectPortabilityTests(unittest.TestCase):
         )
         self.assertIn('"--others"', script)
         self.assertIn('"--exclude-standard"', script)
+        self.assertIn("SECRET_PATTERNS", script)
+        self.assertIn("notebook output or execution state", script)
+
+    def test_gitignore_blocks_private_local_and_biological_artifacts(self):
+        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        for required in (
+            ".envrc",
+            "*.local.*",
+            "*.private.*",
+            "secrets/",
+            "*.p12",
+            "id_rsa.*",
+            "*.csv",
+            "*.tsv",
+            "*.xlsx",
+            "*.gff3.gz",
+        ):
+            self.assertIn(required, gitignore)
 
     def test_ambiguous_csi_cohort_name_is_not_used(self):
         forbidden = "high" + "_csi_hc"
