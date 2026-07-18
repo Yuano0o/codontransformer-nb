@@ -613,3 +613,12 @@ biological data.
 - [Official Colab](https://colab.research.google.com/drive/1WZqXrw49bk3ZDTroY709HwCTabMNOCfL)
 
 See `THIRD_PARTY_NOTICES.md` for the upstream Apache 2.0 attribution.
+
+## License
+
+Unless otherwise noted, the code, configuration, and documentation authored in
+this repository are licensed under the [Apache License 2.0](LICENSE).
+CodonTransformer itself remains a separate upstream dependency; its attribution
+is retained in `THIRD_PARTY_NOTICES.md`. NbenBase source data, locally derived
+datasets, pretrained weights, and fine-tuned checkpoints are not distributed by
+this repository and are not covered by this repository's license.
